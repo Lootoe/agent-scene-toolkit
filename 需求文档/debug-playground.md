@@ -1,6 +1,6 @@
 # Debug Playground — 产品文档
 
-> 关联文档：[agent-kit-core.md](./agent-kit-core.md)
+> 关联文档：[agent-kit-core.md](./lilo-agent-core.md)
 
 ## 一、用户需求
 
