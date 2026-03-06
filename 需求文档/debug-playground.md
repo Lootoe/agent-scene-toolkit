@@ -30,7 +30,7 @@
 | 形态 | 单页面 SPA |
 | 位置 | 项目仓库内（如 `packages/playground`） |
 | 复杂度 | 轻量级，够用即可，不追求复杂工程体系 |
-| 后端依赖 | 调用 `kit.handleRequest()` 暴露的 Express 路由 |
+| 后端依赖 | 调用 `agent.handleRequest()` 暴露的 Express 路由 |
 | 设计风格 | Linear 风格（暗色主题、简洁克制） |
 
 ### 1.4 非目标
@@ -173,9 +173,9 @@ Playground 需要后端提供以下调试专用接口：
 |------|------|------|
 | `/debug/agents` | GET | 返回所有已注册 AgentProfile 列表（name, model） |
 | `/debug/scenes` | GET | 返回所有已注册 Scene 列表（name, toolkits） |
-| `/debug/config` | GET | 返回当前 Kit 配置摘要（maxMessages, supervisor 等） |
+| `/debug/config` | GET | 返回当前 Agent 配置摘要（maxMessages, supervisor 等） |
 
-这些接口由 `kit.handleDebugRequest()` 提供，与 `kit.handleRequest()` 同级，开发模式下挂载。
+这些接口由 `agent.handleDebugRequest()` 提供，与 `agent.handleRequest()` 同级，开发模式下挂载。
 
 ---
 
@@ -281,17 +281,17 @@ flowchart TD
 | 项 | 选型 | 理由 |
 |----|------|------|
 | 技术 | **纯 HTML + CSS + JS** | 调试工具，极致轻量，零构建依赖 |
-| 页面提供方式 | **后端路由直出** | `kit.handlePlayground()` 返回 HTML 字符串，Express 路由 `GET /playground` 直接响应 |
+| 页面提供方式 | **后端路由直出** | `agent.handlePlayground()` 返回 HTML 字符串，Express 路由 `GET /playground` 直接响应 |
 | SSE 接收 | **原生 fetch + ReadableStream** | 浏览器原生，无需额外库 |
 | ID 生成 | **crypto.randomUUID()** | 浏览器原生 API，生成 threadId |
 
 ### 4.2 页面提供方式
 
-HTML/CSS/JS 以**模板字符串**形式内嵌在 `@lilo-agent/core` 源码中（单文件），由 `kit.handlePlayground()` 返回 Express 中间件：
+HTML/CSS/JS 以**模板字符串**形式内嵌在 `@lilo-agent/core` 源码中（单文件），由 `agent.handlePlayground()` 返回 Express 中间件：
 
 ```typescript
 // 使用者只需一行
-app.use(kit.handlePlayground())
+app.use(agent.handlePlayground())
 // 访问 GET /playground 即可打开调试面板
 ```
 
@@ -307,10 +307,10 @@ app.use(kit.handlePlayground())
 | `GET /playground` | GET | 返回 HTML 页面 |
 | `GET /playground/api/agents` | GET | 返回所有已注册 AgentProfile |
 | `GET /playground/api/scenes` | GET | 返回所有已注册 Scene |
-| `GET /playground/api/config` | GET | 返回当前 Kit 配置摘要 |
+| `GET /playground/api/config` | GET | 返回当前 Agent 配置摘要 |
 | `POST /playground/api/chat` | POST | 对话接口，返回 SSE 流 |
 
-所有接口由 `kit.handlePlayground()` 统一挂载到 `/playground` 路径下。
+所有接口由 `agent.handlePlayground()` 统一挂载到 `/playground` 路径下。
 
 ## 五、架构设计
 
