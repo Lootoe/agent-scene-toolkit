@@ -4,33 +4,55 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lilo Playground</title>
-  <style>
-    body{margin:0;background:#0f1115;color:#e6e7eb;font:14px/1.5 Inter,system-ui}
-    #app{display:grid;grid-template-columns:280px 1fr 360px;height:100vh}
-    .panel{border-right:1px solid #242833;padding:12px;overflow:auto}.chat{display:flex;flex-direction:column}
-    .log{border-left:1px solid #242833;padding:12px;overflow:auto}.messages{flex:1;overflow:auto;padding:16px}
-    .input{display:flex;gap:8px;padding:12px;border-top:1px solid #242833}
-    textarea,input,select,button{background:#171a21;color:#e6e7eb;border:1px solid #2a3040;border-radius:8px;padding:8px}
-    textarea{flex:1;min-height:44px;resize:vertical}button{cursor:pointer}.u,.a{margin:8px 0;padding:10px;border-radius:10px;max-width:70%}
-    .u{margin-left:auto;background:#3b82f6;color:#fff}.a{background:#1a1f2b}.event{border:1px solid #2a3040;border-radius:8px;padding:8px;margin:8px 0}
-    .small{font-size:12px;color:#9aa4b2}
-  </style>
+  <link rel="stylesheet" href="/playground/styles.css" />
 </head>
 <body>
   <div id="app">
-    <div class="panel">
-      <h3>Config</h3><div id="status" class="small">checking...</div>
-      <div id="baseURL" class="small"></div><div id="model" class="small"></div>
-      <button id="pingLlm" style="margin:8px 0">连接测试</button>
-      <div>Thread</div><input id="thread" /><button id="newThread">New</button>
-      <div style="margin-top:8px">Agent</div><select id="agents"></select>
-      <div style="margin-top:8px">Scene</div><select id="scenes"></select>
-    </div>
-    <div class="chat">
-      <div id="messages" class="messages"></div>
-      <div class="input"><textarea id="message" placeholder="输入消息，Enter发送"></textarea><button id="send">Send</button></div>
-    </div>
-    <div class="log"><h3>Event Log</h3><div id="events"></div></div>
+    <!-- Left: Config -->
+    <aside class="panel">
+      <div class="panel-section">
+        <div class="section-label">STATUS</div>
+        <div class="status-row"><span class="status-dot" id="statusDot"></span><span id="statusText">checking...</span></div>
+        <div class="meta-text" id="configInfo"></div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">SESSION <button class="btn-icon" id="newThread" title="New session">+</button></div>
+        <input class="input-field" id="thread" readonly />
+      </div>
+      <div class="panel-section">
+        <div class="section-label">AGENT</div>
+        <select class="input-field" id="agents"></select>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">SCENE</div>
+        <select class="input-field" id="scenes"></select>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">CONTEXT</div>
+        <textarea class="input-field ctx-editor" id="sceneCtx" placeholder='{"env":"local"}'></textarea>
+      </div>
+    </aside>
+
+    <!-- Center: Chat -->
+    <main class="chat-area">
+      <div class="messages" id="messages"></div>
+      <div class="input-bar">
+        <textarea class="chat-input" id="message" placeholder="Send a message... Enter to send" rows="1"></textarea>
+        <button class="btn-send" id="send">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M14 8L2 14V9L8 8L2 7V2L14 8Z" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </main>
+
+    <!-- Right: Event Log -->
+    <aside class="panel log-panel">
+      <div class="log-header">
+        <span class="section-label">EVENT LOG</span>
+        <button class="btn-text" id="clearLog">Clear</button>
+      </div>
+      <div class="filter-bar" id="filterBar"></div>
+      <div class="events" id="events"></div>
+    </aside>
   </div>
   <script src="/playground/main.js"></script>
 </body>
