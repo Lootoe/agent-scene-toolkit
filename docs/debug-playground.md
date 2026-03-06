@@ -215,11 +215,102 @@ flowchart TD
 
 ## 三、UI 需求
 
-（待完善）
+> 遵循 [Linear 设计风格指南](./coding/设计风格-linear.md)
+
+### 3.1 整体布局
+
+三栏并排，100vw × 100vh，无全局导航栏，各栏内部独立滚动。
+
+```
+┌──────────┬────────────────────────────┬────────────────┐
+│          │                            │                │
+│ 配置面板  │         对话区              │   事件日志      │
+│ 280px    │        flex: 1             │   360px        │
+│          │                            │                │
+│          ├────────────────────────────┤                │
+│          │       输入区 (固定底部)      │                │
+└──────────┴────────────────────────────┴────────────────┘
+```
+
+- 三栏之间用 `1px` 细线分隔（比背景稍亮的灰色）
+- 各栏内部独立滚动，外层无滚动
+
+---
+
+### 3.2 配置面板（左侧 280px）
+
+从上到下排列，区块间距 24px，区块标题用 11px 大写 + 字间距（Linear 经典标签风格）。
+
+- **连接状态**：顶部，圆点 6px（绿=可达 / 红=断开）+ 状态文字 + 后端地址
+- **会话列表**：标题 `SESSIONS` + `+` 按钮，选中项左侧 2px 强调色竖线
+- **Agent 下拉**：标题 `AGENT`，选中后下方显示 model 信息
+- **Scene 下拉**：标题 `SCENE`，选中后下方显示 toolkits 列表
+- **Context 编辑器**：标题 `CONTEXT`，等宽字体 textarea，非法 JSON 时边框变红 + 错误提示
+
+---
+
+### 3.3 对话区（中间 flex:1）
+
+- **用户消息**：右对齐，强调色背景，白色文字，最大宽度 70%
+- **AI 消息**：左对齐，卡片背景色，上方显示 Agent name（次级文本 12px）
+- **工具卡片**：左侧 2px 彩色竖线（执行中=橙 / 完成=绿），默认折叠，展开显示 Input/Output JSON
+- **Handoff 分隔线**：虚线 + 居中文案 `from → to`
+- **错误卡片**：左侧 2px 红色竖线，浅红底色
+- **输入区**：底部固定，输入框 + 发送/停止按钮，Enter 发送，Shift+Enter 换行
+
+---
+
+### 3.4 事件日志（右侧 360px）
+
+- **头部**：标题 `EVENT LOG` + `Clear` 按钮 + 类型过滤标签栏
+- **事件条目**：类型标签（带对应色彩）+ 毫秒时间戳 + payload 折叠/展开
+- **类型色彩**：text=蓝 / tool_start=橙 / tool_end=绿 / handoff=紫 / agent=青 / error=红 / done=灰
+
+---
+
+### 3.5 交互动效
+
+所有过渡 150ms ease-out，克制不浮夸：hover 背景渐变、工具卡片展开/折叠、消息淡入、输入框 focus 边框变色。
+
+---
 
 ## 四、技术选型
 
-（待完善）
+### 4.1 前端
+
+| 项 | 选型 | 理由 |
+|----|------|------|
+| 技术 | **纯 HTML + CSS + JS** | 调试工具，极致轻量，零构建依赖 |
+| 页面提供方式 | **后端路由直出** | `kit.handlePlayground()` 返回 HTML 字符串，Express 路由 `GET /playground` 直接响应 |
+| SSE 接收 | **原生 fetch + ReadableStream** | 浏览器原生，无需额外库 |
+| ID 生成 | **crypto.randomUUID()** | 浏览器原生 API，生成 threadId |
+
+### 4.2 页面提供方式
+
+HTML/CSS/JS 以**模板字符串**形式内嵌在 `@lilo-agent/core` 源码中（单文件），由 `kit.handlePlayground()` 返回 Express 中间件：
+
+```typescript
+// 使用者只需一行
+app.use(kit.handlePlayground())
+// 访问 GET /playground 即可打开调试面板
+```
+
+优势：
+- 零额外依赖，不需要 `packages/playground` 目录
+- 与库版本绑定，不存在前后端版本不一致问题
+- 使用者无需任何前端构建流程
+
+### 4.3 后端新增接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `GET /playground` | GET | 返回 HTML 页面 |
+| `GET /playground/api/agents` | GET | 返回所有已注册 AgentProfile |
+| `GET /playground/api/scenes` | GET | 返回所有已注册 Scene |
+| `GET /playground/api/config` | GET | 返回当前 Kit 配置摘要 |
+| `POST /playground/api/chat` | POST | 对话接口，返回 SSE 流 |
+
+所有接口由 `kit.handlePlayground()` 统一挂载到 `/playground` 路径下。
 
 ## 五、架构设计
 
