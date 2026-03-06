@@ -808,15 +808,15 @@ export type {
 
 ### 步骤 1：项目骨架 + 单 Agent 闭环
 
-- [ ] 1.1 初始化 `packages/core/`：package.json、tsconfig.json、tsup.config.ts
-- [ ] 1.2 定义核心类型 `types.ts`
-- [ ] 1.3 实现工厂函数 `profile.ts` / `toolkit.ts` / `scene.ts`
-- [ ] 1.4 实现 `prompt.ts`（buildPromptChain 4 层拼接）
-- [ ] 1.5 实现 `graph/single.ts` + `sse.ts`（单 Agent 图构建 + 流事件转换）
-- [ ] 1.6 实现 `agent.ts`（Agent 类 + createAgent）
-- [ ] 1.7 实现 `middleware.ts`（Express 中间件 + handleRequest）
-- [ ] 1.8 实现 `index.ts` 公共导出
-- [ ] 1.9 构建验证：`npm run build` 产出 ESM + CJS + .d.ts
+- [x] 1.1 初始化 `packages/core/`：package.json、tsconfig.json、tsup.config.ts
+- [x] 1.2 定义核心类型 `types.ts`
+- [x] 1.3 实现工厂函数 `profile.ts` / `toolkit.ts` / `scene.ts`
+- [x] 1.4 实现 `prompt.ts`（buildPromptChain 4 层拼接）
+- [x] 1.5 实现 `graph/single.ts` + `sse.ts`（单 Agent 图构建 + 流事件转换）
+- [x] 1.6 实现 `agent.ts`（Agent 类 + createAgent）
+- [x] 1.7 实现 `middleware.ts`（Express 中间件 + handleRequest）
+- [x] 1.8 实现 `index.ts` 公共导出
+- [x] 1.9 构建验证：`npm run build` 产出 ESM + CJS + .d.ts
 
 ### 步骤 2：多 Agent 协作
 
