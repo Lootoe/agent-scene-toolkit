@@ -104,6 +104,13 @@ export interface AgentOptions {
   maxMessages?: number
   /** LangChain Callbacks（如 LangFuse） */
   callbacks?: BaseCallbackHandler[]
+  /** OpenAI 兼容网关配置（如中转商） */
+  llm?: {
+    /** 兼容 OpenAI 的 base URL，例如 https://api.bltcy.ai */
+    baseURL?: string
+    /** API Key，优先级高于环境变量 OPENAI_API_KEY */
+    apiKey?: string
+  }
 }
 
 /**

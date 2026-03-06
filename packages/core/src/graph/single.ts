@@ -4,6 +4,7 @@ import { HumanMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
+import type { AgentOptions } from '../types'
 
 /**
  * 构建单 Agent 图并返回双模式流。
@@ -32,11 +33,20 @@ export async function buildSingleGraph(params: {
   maxMessages: number
   /** LangChain Callbacks */
   callbacks: BaseCallbackHandler[]
+  /** 底层 LLM 网关配置（OpenAI 兼容） */
+  llm?: AgentOptions['llm']
 }) {
   const llm = new ChatOpenAI({
     model: params.model,
+    apiKey: params.llm?.apiKey,
+    configuration: params.llm?.baseURL ? { baseURL: params.llm.baseURL } : undefined,
     callbacks: params.callbacks.length > 0 ? params.callbacks : undefined,
   })
+
+  console.log('[buildSingleGraph] systemPrompt:', JSON.stringify(params.systemPrompt))
+  console.log('[buildSingleGraph] model:', params.model)
+  console.log('[buildSingleGraph] tools:', params.tools.map(t => t.name))
+  console.log('[buildSingleGraph] threadId:', params.threadId)
 
   const graph = createAgent({
     model: llm,

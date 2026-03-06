@@ -14,11 +14,6 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Env
-.env
-.env.*
-!.env.example
-
 # Logs
 *.log
 npm-debug.log*

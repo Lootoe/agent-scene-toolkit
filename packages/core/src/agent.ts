@@ -96,13 +96,18 @@ export class Agent {
         checkpointer: this.options.checkpointer,
         maxMessages: this.options.maxMessages,
         callbacks: this.options.callbacks,
+        llm: this.options.llm,
       })
 
       // 4. 转换流事件 → 标准化 SSE 事件
       yield* transformStream(stream, scene?.onToolEnd)
       yield { type: 'done' }
     } catch (err) {
-      yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
+      const message = err instanceof Error
+        ? `${err.message}${err.cause ? ` | cause: ${err.cause}` : ''}${err.stack ? `\n${err.stack}` : ''}`
+        : String(err)
+      console.error('[agent.chat] error:', message)
+      yield { type: 'error', message }
       yield { type: 'done' }
     }
   }
