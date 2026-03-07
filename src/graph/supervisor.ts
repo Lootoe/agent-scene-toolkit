@@ -134,6 +134,21 @@ export async function buildSupervisorGraph(params: {
       prompt: params.supervisorPrompt,
       // 保留完整消息历史，让前端能追踪 handoff 过程
       outputMode: 'full_history',
+      // 滑动窗口 — 只裁剪发给 LLM 的消息，Checkpointer 仍全量存储
+      // 与 single.ts 的 createMiddleware.beforeModel 策略一致
+      preModelHook: (state: any) => {
+        try {
+          const max = params.maxMessages
+          if (!state.messages || state.messages.length <= max) {
+            return { llmInputMessages: state.messages || [] }
+          }
+          return { llmInputMessages: state.messages.slice(-max) }
+        } catch (error) {
+          // 中间件异常不应阻断流程，记录错误并返回原始消息
+          console.error('[buildSupervisorGraph] sliding-window preModelHook error:', error)
+          return { llmInputMessages: state.messages || [] }
+        }
+      },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

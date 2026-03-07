@@ -76,6 +76,10 @@ const agent = createAgent({
   checkpointer: new MemorySaver(),
   maxMessages: 50,
   callbacks: [new CallbackHandler()],
+  llm: {                             // ← OpenAI 兼容网关（如中转商）
+    baseURL: 'https://api.bltcy.ai',
+    apiKey: 'sk-xxx',
+  },
 })
 
 // 5. 核心调用（Scene 过滤出 canvas + ai 工具，所有 Agent 共享）
@@ -200,6 +204,7 @@ app.post('/chat', agent.handleRequest())
 | checkpointer | BaseCheckpointSaver | ❌ | MemorySaver | LangGraph Checkpointer 实例 |
 | maxMessages | number | ❌ | 50 | 滑动窗口大小 |
 | callbacks | Callbacks[] | ❌ | [] | LangChain Callbacks（如 LangFuse） |
+| llm | { baseURL?: string; apiKey?: string } | ❌ | — | OpenAI 兼容网关配置（如中转商），apiKey 优先级高于环境变量 |
 
 #### ChatOptions — agent.chat() 参数
 
@@ -561,6 +566,13 @@ export interface AgentOptions {
   checkpointer?: BaseCheckpointSaver
   maxMessages?: number
   callbacks?: BaseCallbackHandler[]
+  /** OpenAI 兼容网关配置（如中转商） */
+  llm?: {
+    /** 兼容 OpenAI 的 base URL */
+    baseURL?: string
+    /** API Key，优先级高于环境变量 OPENAI_API_KEY */
+    apiKey?: string
+  }
 }
 
 /** agent.chat() 参数 */
@@ -694,10 +706,18 @@ export function defineScene(input: Scene): Readonly<Scene> {
 ### 6.4 Prompt 拼接 (`prompt.ts`)
 
 ```typescript
-const BASE_PROMPT = `你是一个AI助手。请遵循以下规则：
-- 使用与用户相同的语言回复
-- 不要编造不确定的信息
-- 工具调用时严格按照参数 schema`
+const BASE_PROMPT = `You are an autonomous AI agent. You can reason, plan, and take actions using the tools available to you.
+
+## Core Behavior
+- When given a task, break it down into steps, then execute each step using the appropriate tools.
+- After each tool call, observe the result and decide the next action. Continue until the task is fully completed.
+- If no tools are needed, respond directly with your knowledge.
+- Never fabricate uncertain information. If you cannot complete a task, explain why honestly.
+
+## Rules
+- Respond in the same language as the user.
+- Follow tool parameter schemas strictly — do not invent or omit required fields.
+- When multiple tools are available, choose the most relevant one for the current step.`
 
 export function buildPromptChain(params: {
   profile: AgentProfile
@@ -711,8 +731,15 @@ export function buildPromptChain(params: {
     ...params.toolkitPrompts,
   ]
 
-  if (params.scene && params.sceneContext) {
-    layers.push(params.scene.prompt(params.sceneContext))
+  // Scene 存在时调用 prompt(ctx)，无 sceneContext 则传空对象
+  // Scene.prompt() 异常不阻断流程，记录错误并跳过该层
+  if (params.scene) {
+    try {
+      layers.push(params.scene.prompt(params.sceneContext ?? {}))
+    } catch (error) {
+      console.error('[buildPromptChain] Scene.prompt() error:', error)
+      layers.push(`[Scene context unavailable]`)
+    }
   }
 
   return layers.filter(Boolean).join('\n\n')
@@ -722,21 +749,42 @@ export function buildPromptChain(params: {
 ### 6.5 单 Agent 图 (`graph/single.ts`)
 
 ```typescript
+import { createAgent, createMiddleware } from 'langchain'
+
 export async function buildSingleGraph(params: {
   systemPrompt: string
   tools: StructuredToolInterface[]
-  agents: AgentProfile[]
+  model: string
   message: string
   threadId: string
   checkpointer: BaseCheckpointSaver
   maxMessages: number
   callbacks: BaseCallbackHandler[]
+  llm?: AgentOptions['llm']
 }) {
-  const graph = createReactAgent({
-    llm: new ChatOpenAI({ model: params.agents[0].model }),
+  const llm = new ChatOpenAI({
+    model: params.model,
+    apiKey: params.llm?.apiKey,
+    configuration: params.llm?.baseURL ? { baseURL: params.llm.baseURL } : undefined,
+    callbacks: params.callbacks.length > 0 ? params.callbacks : undefined,
+  })
+
+  const graph = createAgent({
+    model: llm,
     tools: params.tools,
-    checkpointSaver: params.checkpointer,
-    prompt: params.systemPrompt,
+    checkpointer: params.checkpointer,
+    systemPrompt: params.systemPrompt,
+    // 滑动窗口中间件 — beforeModel 阶段裁剪消息，Checkpointer 仍全量存储
+    middleware: [
+      createMiddleware({
+        name: 'sliding-window',
+        beforeModel: (state) => {
+          const max = params.maxMessages
+          if (!state.messages || state.messages.length <= max) return undefined
+          return { messages: state.messages.slice(-max) }
+        },
+      }),
+    ],
   })
 
   return graph.stream(
@@ -744,6 +792,8 @@ export async function buildSingleGraph(params: {
     {
       configurable: { thread_id: params.threadId },
       recursionLimit: 25,
+      streamMode: ['messages', 'updates'],
+      callbacks: params.callbacks.length > 0 ? params.callbacks : undefined,
     },
   )
 }
@@ -752,14 +802,31 @@ export async function buildSingleGraph(params: {
 ### 6.6 SSE 协议层 (`sse.ts`)
 
 ```typescript
-/** LangGraph stream → 标准化 SSEEvent */
+/** LangGraph stream → 标准化 SSEEvent（双 streamMode: messages + updates） */
 export async function* transformStream(
-  stream: AsyncIterable<StreamEvent>,
+  stream: AsyncIterable<any>,
   onToolEnd?: (toolName: string, result: any) => void,
 ): AsyncGenerator<SSEEvent> {
+  let currentAgentName: string | null = null
+
   for await (const chunk of stream) {
-    // LangGraph 事件 → SSEEvent 映射
-    // 实际实现在开发阶段对接 LangGraph API 后确定
+    // 解析 chunk — 单个 chunk 解析失败只跳过，不中断流
+    const { events, detectedAgent } = parseStreamChunk(chunk, currentAgentName)
+
+    // Agent 切换检测 → handoff + agent 事件
+    if (detectedAgent && detectedAgent !== currentAgentName) {
+      if (currentAgentName) yield { type: 'handoff', from: currentAgentName, to: detectedAgent }
+      yield { type: 'agent', name: detectedAgent }
+      currentAgentName = detectedAgent
+    }
+
+    for (const event of events) {
+      yield event
+      // 触发 Scene.onToolEnd 生命周期回调（异常静默捕获）
+      if (event.type === 'tool_end' && onToolEnd) {
+        try { onToolEnd(event.toolName, event.output) } catch {}
+      }
+    }
   }
 }
 
@@ -767,30 +834,43 @@ export async function* transformStream(
 export function formatSSE(event: SSEEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`
 }
-
-/** SSE 响应头 */
-export function writeSSEHeaders(res: Response): void {
-  res.setHeader('Content-Type', 'text/event-stream')
-  res.setHeader('Cache-Control', 'no-cache')
-  res.setHeader('Connection', 'keep-alive')
-  res.setHeader('X-Accel-Buffering', 'no')
-}
 ```
 
 ### 6.7 Express 中间件 (`middleware.ts`)
 
+SSE 响应头写入 (`writeSSEHeaders`) 内置于 middleware 中，不再单独导出。
+
 ```typescript
+function writeSSEHeaders(res: Response): void {
+  res.status(200)
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache, no-transform')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders?.()
+}
+
 export function createExpressHandler(agent: Agent): RequestHandler {
   return async (req, res) => {
     writeSSEHeaders(res)
+
+    // safeWrite 包装 — 客户端断连时静默捕获
+    const safeWrite = (event: SSEEvent): boolean => {
+      try { return res.write(formatSSE(event)) }
+      catch { return false }
+    }
+
     try {
-      for await (const event of agent.chat(req.body)) {
-        res.write(formatSSE(event))
+      const chatOptions = parseChatOptions(req)
+      for await (const event of agent.chat(chatOptions)) {
+        const success = safeWrite(event)
+        if (!success && event.type !== 'done') break  // 客户端断连，提前退出
       }
     } catch (err) {
-      res.write(formatSSE({ type: 'error', message: String(err) }))
+      safeWrite({ type: 'error', message: String(err) })
+      safeWrite({ type: 'done' })
     } finally {
-      res.end()
+      try { res.end() } catch {}
     }
   }
 }
@@ -799,18 +879,26 @@ export function createExpressHandler(agent: Agent): RequestHandler {
 ### 6.8 公共导出 (`index.ts`)
 
 ```typescript
-export { createAgent } from './agent'
+// ─── 核心 API ──────────────────────────────────────────────
+export { createAgent, Agent } from './agent'
 export { defineProfile } from './profile'
 export { defineToolKit } from './toolkit'
 export { defineScene } from './scene'
+export { createExpressHandler } from './middleware'
 export type {
-  AgentOptions,
-  AgentProfile,
-  ChatOptions,
-  Scene,
-  SSEEvent,
   ToolKit,
+  AgentProfile,
+  Scene,
+  AgentOptions,
+  ChatOptions,
+  SSEEvent,
 } from './types'
+
+// ─── 高级 API（按需使用）──────────────────────────────────
+export { buildPromptChain } from './prompt'
+export { buildSingleGraph } from './graph/single'
+export { buildSupervisorGraph } from './graph/supervisor'
+export { transformStream, formatSSE } from './sse'
 ```
 
 ## 七、开发计划

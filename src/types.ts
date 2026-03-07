@@ -86,6 +86,10 @@ export interface Scene {
  *   scene: timelineScene,
  *   checkpointer: new MemorySaver(),
  *   maxMessages: 50,
+ *   llm: {
+ *     baseURL: 'https://api.bltcy.ai',
+ *     apiKey: 'sk-xxx',
+ *   },
  * })
  * ```
  */

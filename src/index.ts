@@ -40,6 +40,10 @@
  *   toolkits: [canvasToolKit],
  *   agents: [director],
  *   scene: timelineScene,
+ *   llm: {
+ *     baseURL: 'https://api.bltcy.ai',
+ *     apiKey: 'sk-xxx',
+ *   },
  * })
  *
  * // 5. 发起对话
