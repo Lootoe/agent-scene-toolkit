@@ -74,7 +74,7 @@ const fileWriteTool = tool(
 
 const profile = defineProfile({
   name: 'assistant',
-  systemPrompt: '你叫喵呜，由喵箱公司开发！.',
+  systemPrompt: '你叫喵呜，由喵箱公司开发！',
   model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
 })
 

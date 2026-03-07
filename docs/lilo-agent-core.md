@@ -435,19 +435,28 @@ graph TB
 ### 5.3 目录结构
 
 ```
-packages/core/src/
-├── index.ts              # 公共导出
-├── types.ts              # 所有类型定义
-├── agent.ts              # Agent 类 + createAgent()（核心，串联完整流程）
-├── profile.ts            # defineProfile() 工厂函数
-├── toolkit.ts            # defineToolKit() 工厂函数
-├── scene.ts              # defineScene() 工厂函数
-├── prompt.ts             # buildPromptChain() 4 层拼接
-├── graph/                # LangGraph 图构建（唯一的变化点）
-│   ├── single.ts         # 单 Agent 图：createReactAgent
-│   └── supervisor.ts     # 多 Agent 图：createSupervisor
-├── sse.ts                # SSE 事件定义 + 格式化 + 流事件转换
-└── middleware.ts          # Express 中间件（handleRequest）
+@lilo-agent/core/
+├── src/                      # 库源码
+│   ├── index.ts              # 公共导出
+│   ├── types.ts              # 所有类型定义
+│   ├── agent.ts              # Agent 类 + createAgent()（核心，串联完整流程）
+│   ├── profile.ts            # defineProfile() 工厂函数
+│   ├── toolkit.ts            # defineToolKit() 工厂函数
+│   ├── scene.ts              # defineScene() 工厂函数
+│   ├── prompt.ts             # buildPromptChain() 4 层拼接
+│   ├── graph/                # LangGraph 图构建（唯一的变化点）
+│   │   ├── single.ts         # 单 Agent 图：createReactAgent
+│   │   └── supervisor.ts     # 多 Agent 图：createSupervisor
+│   ├── sse.ts                # SSE 事件定义 + 格式化 + 流事件转换
+│   └── middleware.ts         # Express 中间件（handleRequest）
+├── playground/               # 调试测试工具（不发布）
+│   ├── server.cjs            # 测试服务器
+│   └── public/               # 静态前端页面
+├── docs/                     # 项目文档
+├── dist/                     # 构建产物
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
 ```
 
 10 个文件，三个核心概念各有对应的 `define` 工厂函数，API 统一。
