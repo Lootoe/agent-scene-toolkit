@@ -1,5 +1,5 @@
-import { isAIMessageChunk, ToolMessage } from '@langchain/core/messages'
-import type { AIMessageChunk, BaseMessage } from '@langchain/core/messages'
+import { AIMessageChunk, ToolMessage } from '@langchain/core/messages'
+import type { BaseMessage } from '@langchain/core/messages'
 import type { SSEEvent } from './types'
 
 /**
@@ -112,12 +112,10 @@ function parseStreamChunk(chunk: any, currentAgentName: string | null): ParseRes
     }
 
     // messages 模式下实际产出 MessageChunk，但 TS 推断为 BaseMessage
-    if (isAIMessageChunk(message as unknown as AIMessageChunk)) {
-      const aiChunk = message as unknown as AIMessageChunk
-
+    if (AIMessageChunk.isInstance(message)) {
       // 工具调用 chunk（tool_start 事件）
-      if (aiChunk.tool_call_chunks && aiChunk.tool_call_chunks.length > 0) {
-        for (const toolChunk of aiChunk.tool_call_chunks) {
+      if (message.tool_call_chunks && message.tool_call_chunks.length > 0) {
+        for (const toolChunk of message.tool_call_chunks) {
           // 只在 name 出现时才 emit tool_start（第一个 chunk 包含 name）
           if (toolChunk.name) {
             events.push({
@@ -130,7 +128,7 @@ function parseStreamChunk(chunk: any, currentAgentName: string | null): ParseRes
       }
 
       // 文本内容 chunk（text 事件）
-      const content = typeof aiChunk.content === 'string' ? aiChunk.content : ''
+      const content = typeof message.content === 'string' ? message.content : ''
       if (content) {
         events.push({ type: 'text', content })
       }
