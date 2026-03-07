@@ -836,6 +836,6 @@ export type {
 
 ### 步骤 3：健壮性 + 文档
 
-- [ ] 3.1 全链路错误处理（参数校验 / LLM 异常 / 工具异常 / Checkpointer 异常）
-- [ ] 3.2 TypeDoc 配置 + TSDoc 注释补全 + `npm run docs`
+- [x] 3.1 全链路错误处理（参数校验 / LLM 异常 / 工具异常 / Checkpointer 异常）
+- [x] 3.2 TypeDoc 配置 + TSDoc 注释补全 + `npm run docs`
 

@@ -57,7 +57,14 @@ export function buildPromptChain(params: {
 
   // ④ Scene — 动态运行时上下文提示词
   if (params.scene) {
-    layers.push(params.scene.prompt(params.sceneContext ?? {}))
+    try {
+      const scenePrompt = params.scene.prompt(params.sceneContext ?? {})
+      layers.push(scenePrompt)
+    } catch (error) {
+      // Scene.prompt() 异常不应阻断流程，记录错误并跳过该层
+      console.error('[buildPromptChain] Scene.prompt() error:', error)
+      layers.push(`[Scene context unavailable due to error: ${error instanceof Error ? error.message : String(error)}]`)
+    }
   }
 
   return layers.filter(Boolean).join('\n\n')

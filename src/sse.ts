@@ -12,6 +12,13 @@ import type { SSEEvent } from './types'
  * - `updates` 模式的 tools 节点输出（ToolMessage）→ `tool_end` 事件
  * - `messages` 模式的 metadata.langgraph_node 变化 → `agent` + `handoff` 事件（多 Agent）
  *
+ * ## 错误处理
+ *
+ * - **流迭代异常**：stream 本身抛出异常时（网络中断、LLM API 异常），
+ *   由调用方（agent.ts）的 try-catch 捕获并转换为 `error` 事件
+ * - **chunk 解析异常**：单个 chunk 解析失败时记录错误并跳过该 chunk，不中断流
+ * - **生命周期回调异常**：onToolEnd 抛出异常时静默捕获，不影响流
+ *
  * @param stream - LangGraph stream() 返回的异步可迭代对象
  * @param onToolEnd - Scene.onToolEnd 生命周期回调（可选）
  */
@@ -23,7 +30,20 @@ export async function* transformStream(
   let currentAgentName: string | null = null
 
   for await (const chunk of stream) {
-    const { events, detectedAgent } = parseStreamChunk(chunk, currentAgentName)
+    let events: SSEEvent[]
+    let detectedAgent: string | null
+
+    // 解析 chunk — 单个 chunk 解析失败不应中断流
+    try {
+      const result = parseStreamChunk(chunk, currentAgentName)
+      events = result.events
+      detectedAgent = result.detectedAgent
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('[transformStream] Failed to parse chunk:', message, chunk)
+      // 跳过该 chunk，继续处理后续流
+      continue
+    }
 
     // 如果检测到 agent 切换，先 emit handoff 和 agent 事件
     if (detectedAgent && detectedAgent !== currentAgentName) {
@@ -41,8 +61,10 @@ export async function* transformStream(
       if (event.type === 'tool_end' && onToolEnd) {
         try {
           onToolEnd(event.toolName, event.output)
-        } catch {
-          // 生命周期回调异常不应影响流
+        } catch (error) {
+          // 生命周期回调异常不应影响流，记录错误并继续
+          const message = error instanceof Error ? error.message : String(error)
+          console.error(`[transformStream] Scene.onToolEnd("${event.toolName}") error:`, message)
         }
       }
     }
