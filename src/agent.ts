@@ -3,6 +3,7 @@ import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
 import { buildPromptChain } from './prompt'
 import { buildSingleGraph } from './graph/single'
+import { buildSupervisorGraph } from './graph/supervisor'
 import { transformStream } from './sse'
 import { createExpressHandler } from './middleware'
 import type { RequestHandler } from 'express'
@@ -76,28 +77,76 @@ export class Agent {
       const tools = activeToolkits.flatMap(tk => tk.tools)
       const toolkitPrompts = activeToolkits.map(tk => tk.prompt)
 
-      // 2. Prompt 4 层拼接
-      const profile = this.options.agents[0]
-      const systemPrompt = buildPromptChain({
-        profile,
-        toolkitPrompts,
-        scene,
-        sceneContext: chatOptions.sceneContext,
-      })
+      // 2. 判断单/多 Agent 策略
+      const isMultiAgent = this.options.agents.length > 1 && !!this.options.supervisor
 
-      // 3. 构建 LangGraph 图 + stream
-      // 步骤 1 只实现单 Agent，步骤 2 补充多 Agent 分支
-      const stream = await buildSingleGraph({
-        systemPrompt,
-        tools,
-        model: profile.model,
-        message: chatOptions.message,
-        threadId: chatOptions.threadId,
-        checkpointer: this.options.checkpointer,
-        maxMessages: this.options.maxMessages,
-        callbacks: this.options.callbacks,
-        llm: this.options.llm,
-      })
+      let stream: AsyncIterable<any>
+
+      if (isMultiAgent) {
+        // 多 Agent 模式：Supervisor + Workers
+        const supervisorProfile = this.options.agents.find(
+          a => a.name === this.options.supervisor,
+        )!
+
+        // Supervisor 的 prompt（4 层拼接）
+        const supervisorPrompt = buildPromptChain({
+          profile: supervisorProfile,
+          toolkitPrompts,
+          scene,
+          sceneContext: chatOptions.sceneContext,
+        })
+
+        // 各 Worker 的 prompt（4 层拼接）
+        const workerPrompts = new Map<string, string>()
+        for (const profile of this.options.agents) {
+          if (profile.name !== this.options.supervisor) {
+            workerPrompts.set(
+              profile.name,
+              buildPromptChain({
+                profile,
+                toolkitPrompts,
+                scene,
+                sceneContext: chatOptions.sceneContext,
+              }),
+            )
+          }
+        }
+
+        stream = await buildSupervisorGraph({
+          supervisorPrompt,
+          agents: this.options.agents,
+          supervisorName: this.options.supervisor!,
+          tools,
+          workerPrompts,
+          message: chatOptions.message,
+          threadId: chatOptions.threadId,
+          checkpointer: this.options.checkpointer,
+          maxMessages: this.options.maxMessages,
+          callbacks: this.options.callbacks,
+          llm: this.options.llm,
+        })
+      } else {
+        // 单 Agent 模式
+        const profile = this.options.agents[0]
+        const systemPrompt = buildPromptChain({
+          profile,
+          toolkitPrompts,
+          scene,
+          sceneContext: chatOptions.sceneContext,
+        })
+
+        stream = await buildSingleGraph({
+          systemPrompt,
+          tools,
+          model: profile.model,
+          message: chatOptions.message,
+          threadId: chatOptions.threadId,
+          checkpointer: this.options.checkpointer,
+          maxMessages: this.options.maxMessages,
+          callbacks: this.options.callbacks,
+          llm: this.options.llm,
+        })
+      }
 
       // 4. 转换流事件 → 标准化 SSE 事件
       yield* transformStream(stream, scene?.onToolEnd)

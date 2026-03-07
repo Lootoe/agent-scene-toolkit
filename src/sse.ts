@@ -8,8 +8,9 @@ import type { SSEEvent } from './types'
  *
  * 事件映射逻辑：
  * - `messages` 模式的 AIMessageChunk（含 content）→ `text` 事件
- * - `updates` 模式的 tools 节点输出（ToolMessage）→ `tool_end` 事件
  * - `messages` 模式的 AIMessageChunk（含 tool_call_chunks）→ `tool_start` 事件
+ * - `updates` 模式的 tools 节点输出（ToolMessage）→ `tool_end` 事件
+ * - `messages` 模式的 metadata.langgraph_node 变化 → `agent` + `handoff` 事件（多 Agent）
  *
  * @param stream - LangGraph stream() 返回的异步可迭代对象
  * @param onToolEnd - Scene.onToolEnd 生命周期回调（可选）
@@ -18,8 +19,21 @@ export async function* transformStream(
   stream: AsyncIterable<any>,
   onToolEnd?: (toolName: string, result: any) => void,
 ): AsyncGenerator<SSEEvent> {
+  // 追踪当前活跃的 agent name，用于检测 handoff
+  let currentAgentName: string | null = null
+
   for await (const chunk of stream) {
-    const events = parseStreamChunk(chunk)
+    const { events, detectedAgent } = parseStreamChunk(chunk, currentAgentName)
+
+    // 如果检测到 agent 切换，先 emit handoff 和 agent 事件
+    if (detectedAgent && detectedAgent !== currentAgentName) {
+      if (currentAgentName) {
+        yield { type: 'handoff', from: currentAgentName, to: detectedAgent }
+      }
+      yield { type: 'agent', name: detectedAgent }
+      currentAgentName = detectedAgent
+    }
+
     for (const event of events) {
       yield event
 
@@ -35,27 +49,50 @@ export async function* transformStream(
   }
 }
 
+/** parseStreamChunk 的返回类型 */
+interface ParseResult {
+  events: SSEEvent[]
+  /** 从 metadata 中检测到的 agent 名称（仅 messages 模式） */
+  detectedAgent: string | null
+}
+
 /**
- * 解析单个 stream chunk 为 SSEEvent 数组。
+ * 解析单个 stream chunk 为 SSEEvent 数组 + agent 检测。
  *
  * LangGraph `stream({ streamMode: ['messages', 'updates'] })` 产出的 chunk 格式：
  * - messages 模式: `['messages', [message, metadata]]`
+ *   - metadata.langgraph_node 标识消息来源节点（即 agent name）
  * - updates 模式: `['updates', { nodeName: { messages: [...] } }]`
  */
-function parseStreamChunk(chunk: any): SSEEvent[] {
+function parseStreamChunk(chunk: any, currentAgentName: string | null): ParseResult {
   const events: SSEEvent[] = []
+  let detectedAgent: string | null = null
 
   // 双 streamMode 下，chunk 是 [streamMode, data] 元组
-  if (!Array.isArray(chunk) || chunk.length !== 2) return events
+  if (!Array.isArray(chunk) || chunk.length !== 2) return { events, detectedAgent }
 
   const [mode, data] = chunk
 
   if (mode === 'messages') {
     // data = [message, metadata]
+    const [message, metadata] = data as [BaseMessage, any]
+
+    // 从 metadata 中提取 agent name（多 Agent 场景）
+    // langgraph_node 标识当前消息来自哪个节点（supervisor / worker name）
+    if (metadata?.langgraph_node && typeof metadata.langgraph_node === 'string') {
+      const nodeName = metadata.langgraph_node as string
+      // 过滤掉内部节点名（如 "tools"、"__start__" 等），只关注 agent 节点
+      if (nodeName !== 'tools' && !nodeName.startsWith('__')) {
+        // Supervisor 模式下，supervisor 节点名默认为 "supervisor"
+        // Worker 节点名为 createReactAgent 时指定的 name
+        detectedAgent = nodeName
+      }
+    }
+
     // messages 模式下实际产出 MessageChunk，但 TS 推断为 BaseMessage
-    const [message] = data as [BaseMessage, any]
     if (isAIMessageChunk(message as unknown as AIMessageChunk)) {
       const aiChunk = message as unknown as AIMessageChunk
+
       // 工具调用 chunk（tool_start 事件）
       if (aiChunk.tool_call_chunks && aiChunk.tool_call_chunks.length > 0) {
         for (const toolChunk of aiChunk.tool_call_chunks) {
@@ -64,7 +101,7 @@ function parseStreamChunk(chunk: any): SSEEvent[] {
             events.push({
               type: 'tool_start',
               toolName: toolChunk.name,
-              input: {}, // 工具入参通过后续 chunk 累积，初始为空
+              input: {},
             })
           }
         }
@@ -83,25 +120,30 @@ function parseStreamChunk(chunk: any): SSEEvent[] {
     if (data && typeof data === 'object') {
       const nodeData = data as Record<string, any>
 
-      // tools 节点的输出包含 ToolMessage
-      if (nodeData.tools && nodeData.tools.messages) {
-        const toolMessages = nodeData.tools.messages as BaseMessage[]
-        for (const msg of toolMessages) {
-          if (msg instanceof ToolMessage) {
-            events.push({
-              type: 'tool_end',
-              toolName: msg.name ?? 'unknown',
-              output: safeParseJSON(
-                typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-              ),
-            })
+      // 遍历所有节点输出，查找 ToolMessage
+      for (const [nodeName, nodeOutput] of Object.entries(nodeData)) {
+        // tools 节点的输出包含 ToolMessage
+        // 单 Agent: nodeName === 'tools'
+        // 多 Agent: nodeName 可能是 worker 内部的 tools 节点（如 '{agentName}_tools'）
+        if (nodeOutput?.messages) {
+          const toolMessages = nodeOutput.messages as BaseMessage[]
+          for (const msg of toolMessages) {
+            if (msg instanceof ToolMessage) {
+              events.push({
+                type: 'tool_end',
+                toolName: msg.name ?? 'unknown',
+                output: safeParseJSON(
+                  typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+                ),
+              })
+            }
           }
         }
       }
     }
   }
 
-  return events
+  return { events, detectedAgent }
 }
 
 /**

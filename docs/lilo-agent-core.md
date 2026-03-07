@@ -829,10 +829,10 @@ export type {
 
 ### 步骤 2：多 Agent 协作
 
-- [ ] 2.1 实现 `graph/supervisor.ts`（多 Agent 图构建）
-- [ ] 2.2 `agent.ts` 补充多 Agent 分支逻辑
-- [ ] 2.3 `sse.ts` 补充 `handoff` / `agent` 事件转换
-- [ ] 2.4 Scene.onToolEnd 生命周期回调触发
+- [x] 2.1 实现 `graph/supervisor.ts`（多 Agent 图构建）
+- [x] 2.2 `agent.ts` 补充多 Agent 分支逻辑
+- [x] 2.3 `sse.ts` 补充 `handoff` / `agent` 事件转换
+- [x] 2.4 Scene.onToolEnd 生命周期回调触发
 
 ### 步骤 3：健壮性 + 文档
 

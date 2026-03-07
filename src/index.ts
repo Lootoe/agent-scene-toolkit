@@ -26,5 +26,6 @@ export { createExpressHandler } from './middleware'
 // Advanced / low-level APIs
 export { buildPromptChain } from './prompt'
 export { buildSingleGraph } from './graph/single'
+export { buildSupervisorGraph } from './graph/supervisor'
 export { transformStream, formatSSE } from './sse'
 
