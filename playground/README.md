@@ -1,6 +1,6 @@
-# @lilo-agent/core Playground
+# agent-scene-toolkit Playground
 
-调试面板，用于体验和测试 `@lilo-agent/core` 的单 Agent 和多 Agent 功能。
+调试面板，用于体验和测试 `agent-scene-toolkit` 的单 Agent 和多 Agent 功能。
 
 ## 快速开始
 

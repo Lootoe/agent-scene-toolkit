@@ -1,5 +1,5 @@
 /**
- * @lilo-agent/core
+ * agent-scene-toolkit
  *
  * Lightweight Agent orchestration library built on LangChain.
  *
@@ -12,7 +12,7 @@
  * ## 快速开始 — 最小示例
  *
  * ```typescript
- * import { createAgent, defineProfile, defineToolKit, defineScene } from '@lilo-agent/core'
+ * import { createAgent, defineProfile, defineToolKit, defineScene } from 'agent-scene-toolkit'
  *
  * // 1. 定义能力包
  * const canvasToolKit = defineToolKit({
@@ -54,7 +54,7 @@
  * 展示所有可选字段：记忆持久化、滑动窗口、LangFuse 观测、Scene 生命周期回调、动态运行时上下文。
  *
  * ```typescript
- * import { createAgent, defineProfile, defineToolKit, defineScene } from '@lilo-agent/core'
+ * import { createAgent, defineProfile, defineToolKit, defineScene } from 'agent-scene-toolkit'
  * import { MemorySaver } from '@langchain/langgraph'
  * import { CallbackHandler } from 'langfuse-langchain'
  *

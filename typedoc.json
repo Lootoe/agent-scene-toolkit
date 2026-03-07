@@ -7,7 +7,7 @@
   "excludeProtected": true,
   "excludeInternal": true,
   "readme": "none",
-  "name": "@lilo-agent/core API Documentation",
+  "name": "agent-scene-toolkit API Documentation",
   "includeVersion": true,
   "sort": ["source-order"],
   "categorizeByGroup": true,

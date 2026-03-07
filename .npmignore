@@ -1,0 +1,9 @@
+src/
+playground/
+docs/
+docs-api/
+node_modules/
+.augment/
+tsup.config.ts
+tsconfig.json
+typedoc.json

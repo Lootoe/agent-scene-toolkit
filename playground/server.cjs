@@ -10,7 +10,7 @@ const {
   defineProfile,
   defineScene,
   defineToolKit,
-} = require('@lilo-agent/core')
+} = require('agent-scene-toolkit')
 
 const app = express()
 app.use(express.json())

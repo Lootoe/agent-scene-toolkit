@@ -1,5 +1,5 @@
 {
-  "name": "@lilo-agent/core",
+  "name": "agent-scene-toolkit",
   "version": "0.1.0",
   "description": "Lightweight Agent orchestration library built on LangChain, with unified SSE streaming.",
   "type": "module",
@@ -19,7 +19,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
@@ -28,6 +29,25 @@
     "playground": "cd playground && node server.cjs",
     "docs": "typedoc"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lootoe/agent-scene-toolkit.git"
+  },
+  "homepage": "https://github.com/Lootoe/agent-scene-toolkit",
+  "bugs": {
+    "url": "https://github.com/Lootoe/agent-scene-toolkit/issues"
+  },
+  "keywords": [
+    "agent",
+    "langchain",
+    "langgraph",
+    "sse",
+    "orchestration",
+    "ai",
+    "scene",
+    "toolkit"
+  ],
+  "author": "Lootoe",
   "peerDependencies": {
     "@langchain/core": "^1.0.0",
     "@langchain/langgraph": "^1.0.0",

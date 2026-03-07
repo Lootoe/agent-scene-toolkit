@@ -1,12 +1,12 @@
 # Debug Playground — 产品文档
 
-> 关联文档：[agent-kit-core.md](./lilo-agent-core.md)
+> 关联文档：[agent-scene-toolkit.md](./agent-scene-toolkit.md)
 
 ## 一、用户需求
 
 ### 1.1 问题背景
 
-`@lilo-agent/core` 开发过程中，验证 SSE 事件流、对话交互、工具调用等行为只能依赖命令行工具（curl / Postman），存在以下痛点：
+`agent-scene-toolkit` 开发过程中，验证 SSE 事件流、对话交互、工具调用等行为只能依赖命令行工具（curl / Postman），存在以下痛点：
 
 - SSE 流式事件无法直观观察，curl 输出是原始文本，难以区分事件类型
 - 多轮对话的记忆连续性验证需要反复拼接 threadId 参数，操作繁琐
@@ -15,7 +15,7 @@
 
 ### 1.2 用户目标
 
-构建一个**轻量级单页调试面板**（Debug Playground），嵌入项目仓库，辅助 `@lilo-agent/core` 的开发调试。核心能力：
+构建一个**轻量级单页调试面板**（Debug Playground），嵌入项目仓库，辅助 `agent-scene-toolkit` 的开发调试。核心能力：
 
 1. **对话调试**：发送消息，实时渲染流式响应（文本逐字输出、工具调用过程可视化）
 2. **配置切换**：在界面上切换 Scene、Agent Profile 等运行时配置，无需改代码重启
@@ -287,7 +287,7 @@ flowchart TD
 
 ### 4.2 页面提供方式
 
-HTML/CSS/JS 以**模板字符串**形式内嵌在 `@lilo-agent/core` 源码中（单文件），由 `agent.handlePlayground()` 返回 Express 中间件：
+HTML/CSS/JS 以**模板字符串**形式内嵌在 `agent-scene-toolkit` 源码中（单文件），由 `agent.handlePlayground()` 返回 Express 中间件：
 
 ```typescript
 // 使用者只需一行
