@@ -900,3 +900,30 @@ export { buildSingleGraph } from './graph/single'
 export { buildSupervisorGraph } from './graph/supervisor'
 export { transformStream, formatSSE } from './sse'
 ```
+
+## 七、开发计划
+
+### 步骤 1：项目骨架 + 单 Agent 闭环
+
+- [x] 1.1 初始化 `packages/core/`：package.json、tsconfig.json、tsup.config.ts
+- [x] 1.2 定义核心类型 `types.ts`
+- [x] 1.3 实现工厂函数 `profile.ts` / `toolkit.ts` / `scene.ts`
+- [x] 1.4 实现 `prompt.ts`（buildPromptChain 4 层拼接）
+- [x] 1.5 实现 `graph/single.ts` + `sse.ts`（单 Agent 图构建 + 流事件转换）
+- [x] 1.6 实现 `agent.ts`（Agent 类 + createAgent）
+- [x] 1.7 实现 `middleware.ts`（Express 中间件 + handleRequest）
+- [x] 1.8 实现 `index.ts` 公共导出
+- [x] 1.9 构建验证：`npm run build` 产出 ESM + CJS + .d.ts
+
+### 步骤 2：多 Agent 协作
+
+- [x] 2.1 实现 `graph/supervisor.ts`（多 Agent 图构建）
+- [x] 2.2 `agent.ts` 补充多 Agent 分支逻辑
+- [x] 2.3 `sse.ts` 补充 `handoff` / `agent` 事件转换
+- [x] 2.4 Scene.onToolEnd 生命周期回调触发
+
+### 步骤 3：健壮性 + 文档
+
+- [x] 3.1 全链路错误处理（参数校验 / LLM 异常 / 工具异常 / Checkpointer 异常）
+- [x] 3.2 TypeDoc 配置 + TSDoc 注释补全 + `npm run docs`
+

@@ -18,5 +18,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Augment
-.augment/
+# TypeDoc
+docs/api/
+
