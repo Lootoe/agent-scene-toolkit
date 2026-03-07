@@ -16,6 +16,8 @@ const app = express()
 app.use(express.json())
 app.use('/playground', express.static(path.join(__dirname, 'public')))
 
+const AGENT_MODE = process.env.AGENT_MODE || 'multi' // 'single' | 'multi'
+
 // ─── Demo Tools ────────────────────────────────────────
 
 const calculatorTool = tool(
@@ -70,13 +72,13 @@ const fileWriteTool = tool(
   }
 )
 
-// ─── Agent Config ──────────────────────────────────────
+// ─── Shared Config ─────────────────────────────────────
 
-const profile = defineProfile({
-  name: 'assistant',
-  systemPrompt: '你叫喵呜，由喵箱公司开发！',
-  model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-})
+const llmConfig = {
+  baseURL: process.env.LLM_BASE_URL || 'https://api3.wlai.vip/v1',
+  apiKey: process.env.LLM_API_KEY || process.env.OPENAI_API_KEY,
+}
+const defaultModel = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
 const toolkit = defineToolKit({
   name: 'debug',
@@ -91,43 +93,89 @@ const scene = defineScene({
   name: 'playground',
   toolkits: ['debug'],
   prompt: ctx => `env=${ctx.env || 'local'}`,
+  onToolEnd: (toolName, result) => {
+    console.log(`[onToolEnd] ${toolName}:`, JSON.stringify(result).slice(0, 200))
+  },
 })
 
+// ─── Agent Profiles ────────────────────────────────────
+
+// 单 Agent 模式：通用助手
+const assistant = defineProfile({
+  name: 'assistant',
+  systemPrompt: '你叫喵呜，由喵箱公司开发！你是一个全能AI助手，擅长回答问题、做数学计算、搜索信息和编写文件。',
+  model: defaultModel,
+})
+
+// 多 Agent 模式：3 个角色协作
+const director = defineProfile({
+  name: 'director',
+  systemPrompt: `你是团队主管。你的职责：
+- 分析用户需求，拆解为子任务
+- 将研究类任务分配给 researcher
+- 将编程/计算类任务分配给 coder
+- 汇总各成员的工作结果，给出最终回答
+- 如果任务简单无需分派，你可以直接回答`,
+  model: defaultModel,
+})
+
+const researcher = defineProfile({
+  name: 'researcher',
+  systemPrompt: `你是研究员，擅长信息检索与分析。你的职责：
+- 使用 web_search 工具搜索信息
+- 整理搜索结果，提炼关键信息
+- 将研究结论汇报给主管`,
+  model: defaultModel,
+})
+
+const coder = defineProfile({
+  name: 'coder',
+  systemPrompt: `你是程序员，擅长计算与文件操作。你的职责：
+- 使用 calculator 工具进行数学计算
+- 使用 file_write 工具保存生成的内容
+- 将计算结果或文件操作结果汇报给主管`,
+  model: defaultModel,
+})
+
+// ─── 构建 Agent 实例 ───────────────────────────────────
+
+const profiles = AGENT_MODE === 'multi'
+  ? [director, researcher, coder]
+  : [assistant]
+
 const agent = createAgent({
-  agents: [profile],
+  agents: profiles,
   toolkits: [toolkit],
   scene,
-  llm: {
-    baseURL: process.env.LLM_BASE_URL || 'https://api3.wlai.vip/v1',
-    apiKey: process.env.LLM_API_KEY || process.env.OPENAI_API_KEY,
-  },
+  llm: llmConfig,
+  ...(AGENT_MODE === 'multi' ? { supervisor: 'director' } : {}),
 })
 
 // ─── Routes ────────────────────────────────────────────
 
 app.get('/playground/api/agents', (_req, res) => {
-  res.json([{ name: profile.name, model: profile.model }])
+  res.json(profiles.map(p => ({ name: p.name, model: p.model })))
 })
 app.get('/playground/api/scenes', (_req, res) => {
   res.json([{ name: scene.name, toolkits: scene.toolkits }])
 })
 app.get('/playground/api/config', (_req, res) => {
   res.json({
-    baseURL: process.env.LLM_BASE_URL || 'https://api3.wlai.vip/v1',
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-    hasApiKey: Boolean(process.env.LLM_API_KEY || process.env.OPENAI_API_KEY),
+    mode: AGENT_MODE,
+    supervisor: AGENT_MODE === 'multi' ? 'director' : null,
+    baseURL: llmConfig.baseURL,
+    model: defaultModel,
+    hasApiKey: Boolean(llmConfig.apiKey),
   })
 })
 app.get('/playground/api/ping-llm', async (_req, res) => {
   try {
-    const model = new ChatOpenAI({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      apiKey: process.env.LLM_API_KEY || process.env.OPENAI_API_KEY,
-      configuration: {
-        baseURL: process.env.LLM_BASE_URL || 'https://api3.wlai.vip/v1',
-      },
+    const m = new ChatOpenAI({
+      model: defaultModel,
+      apiKey: llmConfig.apiKey,
+      configuration: { baseURL: llmConfig.baseURL },
     })
-    await model.invoke('reply with pong only')
+    await m.invoke('reply with pong only')
     res.json({ ok: true })
   } catch (error) {
     res.status(500).json({
@@ -144,6 +192,11 @@ app.post('/playground/api/chat', (req, _res, next) => {
 const port = Number(process.env.PORT || 3001)
 app.listen(port, () => {
   console.log(`Playground: http://localhost:${port}/playground`)
-  console.log(`  model: ${process.env.OPENAI_MODEL || 'gpt-4o-mini'}`)
+  console.log(`  mode: ${AGENT_MODE}`)
+  console.log(`  model: ${defaultModel}`)
+  if (AGENT_MODE === 'multi') {
+    console.log(`  supervisor: director`)
+    console.log(`  workers: researcher, coder`)
+  }
 })
 

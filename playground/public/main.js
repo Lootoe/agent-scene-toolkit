@@ -16,7 +16,9 @@ async function boot() {
     ])
     $('statusDot').classList.add('ok')
     $('statusText').textContent = 'connected'
-    $('configInfo').textContent = config.model + ' @ ' + config.baseURL
+    const modeLabel = config.mode === 'multi' ? 'multi-agent' : 'single-agent'
+    const supLabel = config.supervisor ? ' · supervisor: ' + config.supervisor : ''
+    $('configInfo').textContent = modeLabel + supLabel + '\n' + config.model + ' @ ' + config.baseURL
     $('agents').innerHTML = agents.map(a => '<option value="' + a.name + '">' + a.name + ' (' + a.model + ')</option>').join('')
     $('scenes').innerHTML = '<option value="">(none)</option>' + scenes.map(s => '<option value="' + s.name + '">' + s.name + '</option>').join('')
   } catch { $('statusText').textContent = 'disconnected' }
