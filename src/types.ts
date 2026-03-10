@@ -106,7 +106,7 @@ export interface AgentOptions {
   checkpointer?: BaseCheckpointSaver
   /** 滑动窗口大小（默认 50） */
   maxMessages?: number
-  /** LangChain Callbacks（如 LangFuse） */
+  /** LangChain Callbacks */
   callbacks?: BaseCallbackHandler[]
   /** OpenAI 兼容网关配置（如中转商） */
   llm?: {

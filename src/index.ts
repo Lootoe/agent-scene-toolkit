@@ -51,19 +51,11 @@
  *
  * ## 完整配置
  *
- * 展示所有可选字段：记忆持久化、滑动窗口、LangFuse 观测、Scene 生命周期回调、动态运行时上下文。
+ * 展示所有可选字段：记忆持久化、滑动窗口、Scene 生命周期回调、动态运行时上下文。
  *
  * ```typescript
  * import { createAgent, defineProfile, defineToolKit, defineScene } from 'agent-scene-toolkit'
  * import { MemorySaver } from '@langchain/langgraph'
- * import { CallbackHandler } from 'langfuse-langchain'
- *
- * // LangFuse 观测回调（也可通过环境变量 LANGFUSE_SECRET_KEY / LANGFUSE_PUBLIC_KEY / LANGFUSE_HOST 配置）
- * const langfuseHandler = new CallbackHandler({
- *   secretKey: 'sk-lf-xxx',
- *   publicKey: 'pk-lf-xxx',
- *   baseUrl: 'https://langfuse.your-domain.com',   // 自部署地址
- * })
  *
  * const agent = createAgent({
  *   toolkits: [canvasToolKit, aiToolKit],
@@ -78,7 +70,6 @@
  *   }),
  *   checkpointer: new MemorySaver(),                // 记忆持久化（生产环境用 PostgresSaver）
  *   maxMessages: 50,                                // 滑动窗口大小（默认 50）
- *   callbacks: [langfuseHandler],                   // 透传给 LLM + LangGraph，追踪完整执行链路
  *   llm: { baseURL: 'https://api.bltcy.ai', apiKey: 'sk-xxx' },
  * })
  *

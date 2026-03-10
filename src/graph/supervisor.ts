@@ -68,6 +68,8 @@ export async function buildSupervisorGraph(params: {
         model: profile.model,
         apiKey: params.llm?.apiKey,
         configuration: params.llm?.baseURL ? { baseURL: params.llm.baseURL } : undefined,
+        // 禁止工具并行调用，确保工具按顺序执行
+        parallel_tool_calls: false,
         callbacks: callbacksOrUndefined,
       })
 
@@ -109,6 +111,8 @@ export async function buildSupervisorGraph(params: {
       model: supervisorProfile.model,
       apiKey: params.llm?.apiKey,
       configuration: params.llm?.baseURL ? { baseURL: params.llm.baseURL } : undefined,
+      // 禁止工具并行调用，确保工具按顺序执行
+      parallel_tool_calls: false,
       callbacks: callbacksOrUndefined,
     })
   } catch (error) {

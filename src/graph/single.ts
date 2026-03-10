@@ -15,7 +15,7 @@ import type { AgentOptions } from '../types'
  * - 节点级别的完整更新（updates 模式，用于工具调用结果）
  *
  * Callbacks 在 LLM 层和 graph.stream() 层双重透传，
- * 确保 LangFuse 等观测工具能追踪完整 Agent 执行链路。
+ * 确保观测工具能追踪完整 Agent 执行链路。
  *
  * ## 错误处理策略
  *
@@ -62,6 +62,8 @@ export async function buildSingleGraph(params: {
       model: params.model,
       apiKey: params.llm?.apiKey,
       configuration: params.llm?.baseURL ? { baseURL: params.llm.baseURL } : undefined,
+      // 禁止工具并行调用，确保工具按顺序执行
+      parallel_tool_calls: false,
       // LLM 层透传 callbacks — 追踪 LLM 调用本身
       callbacks: callbacksOrUndefined,
     })
