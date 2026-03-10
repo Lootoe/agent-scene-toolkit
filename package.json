@@ -1,6 +1,6 @@
 {
   "name": "agent-scene-toolkit",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Lightweight Agent orchestration library built on LangChain, with unified SSE streaming.",
   "type": "module",
   "main": "./dist/index.cjs",

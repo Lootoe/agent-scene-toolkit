@@ -62,8 +62,6 @@ export async function buildSingleGraph(params: {
       model: params.model,
       apiKey: params.llm?.apiKey,
       configuration: params.llm?.baseURL ? { baseURL: params.llm.baseURL } : undefined,
-      // 禁止工具并行调用，确保工具按顺序执行
-      parallel_tool_calls: false,
       // LLM 层透传 callbacks — 追踪 LLM 调用本身
       callbacks: callbacksOrUndefined,
     })
