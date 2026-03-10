@@ -8,6 +8,7 @@
  * - **ToolKit**：静态能力包，按领域分组的工具集 + 使用策略 Prompt
  * - **AgentProfile**：角色身份，只需定义 name + systemPrompt + model
  * - **Scene**：运行时场景，注入动态上下文 + 决定当前可用的 ToolKit
+ * - **KnowledgeBase**：知识库（RAG），纯文本数据 + 语义检索，AI 按需查阅
  *
  * ## 快速开始 — 最小示例
  *
@@ -153,6 +154,7 @@ export type {
   ToolKit,
   AgentProfile,
   Scene,
+  KnowledgeBase,
   AgentOptions,
   ChatOptions,
   SSEEvent,
@@ -180,6 +182,13 @@ export { defineToolKit } from './toolkit'
  * @category Factory Functions
  */
 export { defineScene } from './scene'
+
+/**
+ * 定义知识库（RAG 检索增强生成）。
+ *
+ * @category Factory Functions
+ */
+export { defineKnowledgeBase } from './knowledge'
 
 // ─── Runtime APIs ────────────────────────────────────────────
 

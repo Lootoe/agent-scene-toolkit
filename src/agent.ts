@@ -1,11 +1,13 @@
 import { MemorySaver } from '@langchain/langgraph'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
+import type { DynamicTool } from '@langchain/core/tools'
 import { buildPromptChain } from './prompt'
 import { buildSingleGraph } from './graph/single'
 import { buildSupervisorGraph } from './graph/supervisor'
 import { transformStream } from './sse'
 import { createExpressHandler } from './middleware'
+import { initVectorStores, buildKnowledgeTools } from './rag'
 import type { RequestHandler } from 'express'
 import type { AgentOptions, ChatOptions, SSEEvent } from './types'
 
@@ -31,6 +33,12 @@ export class Agent {
   /** @internal */
   readonly options: ResolvedOptions
 
+  /** RAG 知识库转换而来的 DynamicTool 列表 */
+  private knowledgeTools: DynamicTool[] = []
+
+  /** 异步初始化 Promise（向量化知识库等） */
+  private readyPromise: Promise<void>
+
   constructor(options: AgentOptions) {
     this.options = {
       maxMessages: 50,
@@ -39,6 +47,28 @@ export class Agent {
       ...options,
     }
     this.validate()
+    this.readyPromise = this.init()
+  }
+
+  /**
+   * 异步初始化 — 向量化知识库并构建检索 Tool。
+   *
+   * 在构造函数中启动，chat() 首次调用时 await 确保完成。
+   * 若无 knowledgeBases，立即 resolve。
+   */
+  private async init(): Promise<void> {
+    const { knowledgeBases, embeddings } = this.options
+    if (!knowledgeBases?.length || !embeddings) return
+
+    try {
+      const stores = await initVectorStores(knowledgeBases, embeddings)
+      this.knowledgeTools = buildKnowledgeTools(stores, embeddings)
+      console.log(`[Agent] ${this.knowledgeTools.length} knowledge tool(s) ready`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('[Agent] Knowledge base initialization failed:', message)
+      throw error
+    }
   }
 
   /**
@@ -57,6 +87,9 @@ export class Agent {
    */
   async *chat(chatOptions: ChatOptions): AsyncGenerator<SSEEvent> {
     try {
+      // 确保知识库向量化完成
+      await this.readyPromise
+
       // 参数校验
       if (!chatOptions.message) {
         yield { type: 'error', message: 'message is required' }
@@ -74,7 +107,10 @@ export class Agent {
       const activeToolkits = scene
         ? this.options.toolkits.filter(tk => scene.toolkits.includes(tk.name))
         : this.options.toolkits
-      const tools = activeToolkits.flatMap(tk => tk.tools)
+      const tools = [
+        ...activeToolkits.flatMap(tk => tk.tools),
+        ...this.knowledgeTools,  // RAG 知识库 Tool 注入
+      ]
       const toolkitPrompts = activeToolkits.map(tk => tk.prompt)
 
       // 2. 判断单/多 Agent 策略
@@ -194,6 +230,10 @@ export class Agent {
           throw new Error(`Scene references toolkit "${name}" which is not registered`)
         }
       }
+    }
+    // 校验 knowledgeBases 与 embeddings 配套
+    if (this.options.knowledgeBases?.length && !this.options.embeddings) {
+      throw new Error('embeddings is required when knowledgeBases is provided')
     }
   }
 }

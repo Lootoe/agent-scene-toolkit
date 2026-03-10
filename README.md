@@ -9,6 +9,7 @@ Lightweight Agent orchestration library built on LangChain.
 - **ToolKit**：静态能力包，按领域分组的工具集 + 使用策略 Prompt
 - **AgentProfile**：角色身份，只需定义 name + systemPrompt + model
 - **Scene**：运行时场景，注入动态上下文 + 决定当前可用的 ToolKit
+- **KnowledgeBase**：知识库（RAG），纯文本数据 + 语义检索，AI 按需查阅
 
 ## 📦 Install
 
@@ -124,6 +125,115 @@ for await (const event of agent.chat({ message: '写一个30秒的广告脚本',
   if (event.type === 'handoff') console.log(`🔀 ${event.from} → ${event.to}`)
   if (event.type === 'text')    process.stdout.write(event.content)
 }
+```
+
+## RAG 知识库
+
+让 Agent 具备**按需检索外部知识**的能力。只需提供文本数据 + 嵌入模型，AI 自动判断何时检索。
+
+### 基本用法
+
+```typescript
+import { createAgent, defineProfile, defineKnowledgeBase } from 'agent-scene-toolkit'
+// 使用者自行选择嵌入模型（本地免费 / OpenAI / 其他）
+import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/hf_transformers'
+
+// 1. 定义知识库
+const faqKB = defineKnowledgeBase({
+  name: 'faq',
+  description: '产品常见问题，当用户问功能、价格、退款等问题时检索',
+  documents: [
+    '7天内无理由退款，联系客服即可办理',
+    '基础版99元/月，专业版299元/月',
+    '支持微信、支付宝、银行卡付款',
+    '工作日 9:00-18:00 提供在线客服',
+  ],
+})
+
+// 2. 创建 Agent，传入知识库 + 嵌入模型
+const agent = createAgent({
+  agents: [defineProfile({ name: '客服', systemPrompt: '你是产品客服...', model: 'gpt-4o' })],
+  knowledgeBases: [faqKB],
+  embeddings: new HuggingFaceTransformersEmbeddings({
+    model: 'Xenova/all-MiniLM-L6-v2',
+  }),
+  llm: { baseURL: 'https://api.bltcy.ai', apiKey: 'sk-xxx' },
+})
+
+// 3. 对话 — AI 自动判断是否需要检索
+for await (const event of agent.chat({ message: '怎么退款？', threadId: 't-1' })) {
+  if (event.type === 'text') process.stdout.write(event.content)
+}
+```
+
+### 从数据库 / API 动态加载
+
+`documents` 支持异步函数，Agent 创建时自动调用加载数据：
+
+```typescript
+const dynamicKB = defineKnowledgeBase({
+  name: 'product-docs',
+  description: '产品操作手册',
+  documents: async () => {
+    // 从数据库加载
+    const rows = await db.query('SELECT content FROM docs')
+    return rows.map(r => r.content)
+
+    // 或从 API 加载
+    // const res = await fetch('https://my-api.com/docs')
+    // return res.json()
+  },
+})
+```
+
+### 多知识库
+
+AI 根据每个知识库的 `description` 自动选择检索哪个：
+
+```typescript
+const faqKB = defineKnowledgeBase({
+  name: 'faq',
+  description: '产品常见问题',
+  documents: ['7天内无理由退款', ...],
+})
+
+const apiDocsKB = defineKnowledgeBase({
+  name: 'api-docs',
+  description: 'API 接口文档，当用户问技术集成、接口调用时检索',
+  documents: ['POST /api/users 创建用户', ...],
+  topK: 5,  // 返回前 5 条最相关结果（默认 3）
+})
+
+const agent = createAgent({
+  agents: [developer],
+  knowledgeBases: [faqKB, apiDocsKB],
+  embeddings: new HuggingFaceTransformersEmbeddings({ model: 'Xenova/all-MiniLM-L6-v2' }),
+  llm: { ... },
+})
+```
+
+### SSE 事件
+
+知识库检索复用 `tool_start` / `tool_end` 事件，**前端无需任何改动**：
+
+```
+data: {"type":"tool_start","toolName":"faq","input":{"query":"退款政策"}}
+data: {"type":"tool_end","toolName":"faq","output":"7天内无理由退款，联系客服即可办理"}
+data: {"type":"text","content":"根据我们的政策，7天内可以无理由退款..."}
+```
+
+### 嵌入模型选择
+
+库不内置嵌入模型，由使用者自行选择：
+
+```typescript
+// 方案 A：本地免费模型（推荐）
+import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/hf_transformers'
+const embeddings = new HuggingFaceTransformersEmbeddings({ model: 'Xenova/all-MiniLM-L6-v2' })
+
+// 方案 B：OpenAI Embeddings（需 API Key）
+import { OpenAIEmbeddings } from '@langchain/openai'
+const embeddings = new OpenAIEmbeddings({ model: 'text-embedding-3-small' })
 ```
 
 ## Express 集成

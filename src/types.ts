@@ -1,6 +1,7 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base'
+import type { EmbeddingsInterface } from '@langchain/core/embeddings'
 
 // ─── 核心概念 ────────────────────────────────────────────
 
@@ -72,6 +73,41 @@ export interface Scene {
   readonly onToolEnd?: (toolName: string, result: any) => void
 }
 
+/**
+ * 知识库 — 纯文本数据 + 语义检索描述。
+ *
+ * 库内部自动将文本向量化并包装为 LangChain Tool，AI 根据 `description` 自主决定何时检索。
+ *
+ * @example
+ * ```ts
+ * const faqKB = defineKnowledgeBase({
+ *   name: 'faq',
+ *   description: '产品常见问题，当用户问功能、价格、退款等问题时检索',
+ *   documents: ['7天内无理由退款', '基础版99元/月'],
+ * })
+ *
+ * // 也支持异步加载
+ * const dynamicKB = defineKnowledgeBase({
+ *   name: 'dynamic-docs',
+ *   description: '从数据库动态加载的文档',
+ *   documents: async () => {
+ *     const res = await fetch('/api/docs')
+ *     return res.json()
+ *   },
+ * })
+ * ```
+ */
+export interface KnowledgeBase {
+  /** 知识库唯一标识，也作为 Tool 名称 */
+  readonly name: string
+  /** 描述知识库用途，AI 据此判断何时检索 */
+  readonly description: string
+  /** 纯文本数据：静态数组或异步加载函数 */
+  readonly documents: string[] | (() => Promise<string[]>)
+  /** 返回最相关的前 K 条结果（默认 3） */
+  readonly topK?: number
+}
+
 // ─── 配置项 ──────────────────────────────────────────────
 
 /**
@@ -108,6 +144,10 @@ export interface AgentOptions {
   maxMessages?: number
   /** LangChain Callbacks */
   callbacks?: BaseCallbackHandler[]
+  /** 知识库列表，有值则启用 RAG（检索增强生成） */
+  knowledgeBases?: KnowledgeBase[]
+  /** 嵌入模型实例，当 knowledgeBases 存在时必填 */
+  embeddings?: EmbeddingsInterface
   /** OpenAI 兼容网关配置（如中转商） */
   llm?: {
     /** 兼容 OpenAI 的 base URL，例如 https://api.bltcy.ai */
